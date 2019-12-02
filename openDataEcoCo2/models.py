@@ -1,5 +1,4 @@
 from django.db import models
-from django import forms
 
 class Record(models.Model):
     recordid =  models.CharField(max_length=100, primary_key=True)
@@ -27,10 +26,10 @@ class Record(models.Model):
     fioul_cogen = models.IntegerField(blank=True, null=True)
     ech_comm_espagne = models.IntegerField(blank=True, null=True)
     bioenergies_biomasse = models.IntegerField(blank=True, null=True)
-    date = forms.DateField()
+    date = models.DateField()
     bioenergies_dechets = models.IntegerField(blank=True, null=True)
     taux_co2 = models.IntegerField(blank=True, null=True)
-    heure = forms.TimeField(widget=forms.TimeInput(format="%H:%M"))
+    heure = models.TimeField()
     hydraulique_fil_eau_eclusee = models.IntegerField(blank=True, null=True)
     bioenergies_biogaz = models.IntegerField(blank=True, null=True)
     fioul_tac = models.IntegerField(blank=True, null=True)
