@@ -39,5 +39,5 @@ class Record(models.Model):
     bioenergies = models.IntegerField(blank=True, null=True)
     ech_comm_angleterre = models.IntegerField(blank=True, null=True)
     consommation = models.IntegerField(blank=True, null=True)
-
-# Create your models here.
+    def __str__(self):
+        return self.date_heure
