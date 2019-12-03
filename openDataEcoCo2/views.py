@@ -1,5 +1,6 @@
 import requests
 from .models import Record
+from datetime import datetime
 from django.http import HttpResponse
 
 def retrieve(request):
@@ -9,6 +10,7 @@ def retrieve(request):
 	#  For testing purposes we only iterate on 10 rows of data
 	n = 10
 	
+	# Check if the request for data was successfully received
 	if response.status_code == 200:
 		record = response.json()
 		
@@ -20,19 +22,64 @@ def retrieve(request):
 		if n > rows :
 			n = rows
 		
-		for i in range(0, n, 2) :
-			fields = record["records"][i+1]["fields"]
+		for i in range(n) :
+			fields = record["records"][i]["fields"]
+			h = datetime.strptime(fields["heure"], "%H:%M")
 			
-			r2 = Record(recordid = record["records"][i+1]["recordid"],
-			prevision_j1 = fields["prevision_j1"],
-			nature = fields["nature"],
-			date_heure = fields["date_heure"],
-			perimetre = fields["perimetre"],
-			date = fields["date"],
-			heure = fields["heure"],
-			prevision_j = fields["prevision_j"])
-			
-			r2.save()
+			# Each half hour, the dataset from the API contains a value for each field
+			if (h.minute == 0) or (h.minute == 30) :
+				r = Record(recordid = record["records"][i]["recordid"],
+				hydraulique_step_turbinage = fields["hydraulique_step_turbinage"],
+				perimetre = fields["perimetre"],
+				hydraulique_lacs = fields["hydraulique_lacs"],
+				eolien = fields["eolien"],
+				hydraulique = fields["hydraulique"],
+				ech_comm_italie = fields["ech_comm_italie"],
+				ech_comm_suisse = fields["ech_comm_suisse"],
+				fioul_autres = fields["fioul_autres"],
+				prevision_j1 = fields["prevision_j1"],
+				ech_physiques = fields["ech_physiques"],
+				ech_comm_allemagne_belgique = fields["ech_comm_allemagne_belgique"],
+				solaire = fields["solaire"],
+				nucleaire = fields["nucleaire"],
+				gaz_tac = fields["gaz_tac"],
+				pompage = fields["pompage"],
+				prevision_j = fields["prevision_j"],
+				fioul = fields["fioul"],
+				gaz = fields["gaz"],
+				nature = fields["nature"],
+				gaz_cogen = fields["gaz_cogen"],
+				gaz_autres = fields["gaz_autres"],
+				fioul_cogen = fields["fioul_cogen"],
+				ech_comm_espagne = fields["ech_comm_espagne"],
+				bioenergies_biomasse = fields["bioenergies_biomasse"],
+				date = fields["date"],
+				bioenergies_dechets = fields["bioenergies_dechets"],
+				taux_co2 = fields["taux_co2"],
+				heure = h,
+				hydraulique_fil_eau_eclusee = fields["hydraulique_fil_eau_eclusee"],
+				bioenergies_biogaz = fields["bioenergies_biogaz"],
+				fioul_tac = fields["fioul_tac"],
+				gaz_ccg = fields["gaz_ccg"],
+				date_heure = fields["date_heure"],
+				charbon = fields["charbon"],
+				bioenergies = fields["bioenergies"],
+				ech_comm_angleterre = fields["ech_comm_angleterre"],
+				consommation = fields["consommation"])
+				
+				r.save()
+			# The 2 other points of data each hour have a lot less filled out
+			else :
+				r = Record(recordid = record["records"][i]["recordid"],
+				prevision_j1 = fields["prevision_j1"],
+				nature = fields["nature"],
+				date_heure = fields["date_heure"],
+				perimetre = fields["perimetre"],
+				date = fields["date"],
+				heure = h,
+				prevision_j = fields["prevision_j"])
+				
+				r.save()
 	else :
-		raise Http404("Request was not succesfully received")
-	return HttpResponse("All the from 2017 and 2018 has been retrieved")
+		raise Http404("Request was not successfully received")
+	return HttpResponse("All the data from 2017 and 2018 has been retrieved")
