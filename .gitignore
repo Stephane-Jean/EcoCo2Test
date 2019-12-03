@@ -1,7 +1,7 @@
 # pycache folders
 EcoCo2Test/__pycache__/
 openDataEcoCo2/__pycache__/
-openDataEcoCo2/migrations/__pycache__/
+openDataEcoCo2/migrations/
 
 # Django db
 db.sqlite3
