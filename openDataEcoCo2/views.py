@@ -1,32 +1,44 @@
 import requests
 from .models import Record
 from datetime import datetime
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 
 def retrieve(request):
-	# We will iterate on 9984 rows of data
+	# We will iterate on 9985 rows of data
 	# It corresponds to 104 days of data + the first Record of the next day
-	# 10k is the maximum number of data we can retrieve at once
-	n = 9984
-	nhits = n
+	# The bigger the batch we use the faster the treatment gets and 10k is the maximum number of rows we can retrieve at once
+	n_init = 9985
+	n = n_init
+	nhits = n_init
+	rows = n_init
 	
 	# Total number of retrieved Records
 	nTot = 0
 	
 	# We will retrieve all the record from 2017 and 2018
-	# We start on 2017/01/01
-	d = "2017-01-01"
-
-	# At the last step of the data retrieval there will be less than 961 Records to retrieve
-	while nhits >= 9984 :
+	# We start on 2017/01/01 end on 2018/12/31
+	startDate = "2017-01-01"
+	endDate = "2018-12-31"
+	
+	# Test if there is anything wrong with the request
+	response = requests.get("https://opendata.reseaux-energies.fr/api/records/1.0/search/?dataset=eco2mix-national-cons-def&q=date_heure%3E%3D%22"+startDate+"T00%3A00%3A00Z%22%26date_heure%3C%3D%22"+endDate+"T23%3A59%3A59Z%22&rows="+str(rows)+"&sort=-date_heure&facet=date_heure")
+	if response.status_code == 200:
+		record = response.json()
+		if record["nhits"] == 0 :
+			raise Http404("There are no data for those starting and ending dates")
+	else :
+		raise Http404("Request was not successfully received")
+	
+	# At the last step of the data retrieval there will be less than 9985 Records to retrieve
+	while nhits >= n_init :
 		# Request q : date_heure>="2017-01-01T00:00:00Z"&date_heure<="2018-12-31T23:59:59Z"
-		response = requests.get("https://opendata.reseaux-energies.fr/api/records/1.0/search/?dataset=eco2mix-national-cons-def&q=date_heure%3E%3D%22"+d+"T00%3A00%3A00Z%22%26date_heure%3C%3D%222018-12-31T23%3A59%3A59Z%22&rows="+str(n)+"&sort=-date_heure&facet=date_heure")
+		response = requests.get("https://opendata.reseaux-energies.fr/api/records/1.0/search/?dataset=eco2mix-national-cons-def&q=date_heure%3E%3D%22"+startDate+"T00%3A00%3A00Z%22%26date_heure%3C%3D%22"+endDate+"T23%3A59%3A59Z%22&rows="+str(rows)+"&sort=-date_heure&facet=date_heure")
 		
 		# Check if the request for data was successfully received
 		if response.status_code == 200:
 			record = response.json()
 			
-			# If there is not enough data in the response, we want to stop before reaching 10 000
+			# If there is not enough data in the response, we want to stop before reaching n
 			nhits = record["nhits"]
 			rows = record["parameters"]["rows"]
 			if n > nhits :
@@ -38,62 +50,16 @@ def retrieve(request):
 				fields = record["records"][i]["fields"]
 				h = datetime.strptime(fields["heure"], "%H:%M")
 				
-				# Each half hour, the dataset from the API contains a value for each field
+				# Each half hour, the dataset from the API contains a value for the CO2 rate
 				if (h.minute == 0) or (h.minute == 30) :
 					r = Record(recordid = record["records"][i]["recordid"],
-					hydraulique_step_turbinage = fields["hydraulique_step_turbinage"],
-					perimetre = fields["perimetre"],
-					hydraulique_lacs = fields["hydraulique_lacs"],
-					eolien = fields["eolien"],
-					hydraulique = fields["hydraulique"],
-					ech_comm_italie = fields["ech_comm_italie"],
-					ech_comm_suisse = fields["ech_comm_suisse"],
-					fioul_autres = fields["fioul_autres"],
-					prevision_j1 = fields["prevision_j1"],
-					ech_physiques = fields["ech_physiques"],
-					ech_comm_allemagne_belgique = fields["ech_comm_allemagne_belgique"],
-					solaire = fields["solaire"],
-					nucleaire = fields["nucleaire"],
-					gaz_tac = fields["gaz_tac"],
-					pompage = fields["pompage"],
-					prevision_j = fields["prevision_j"],
-					fioul = fields["fioul"],
-					gaz = fields["gaz"],
-					nature = fields["nature"],
-					gaz_cogen = fields["gaz_cogen"],
-					gaz_autres = fields["gaz_autres"],
-					fioul_cogen = fields["fioul_cogen"],
-					ech_comm_espagne = fields["ech_comm_espagne"],
-					bioenergies_biomasse = fields["bioenergies_biomasse"],
-					date = fields["date"],
-					bioenergies_dechets = fields["bioenergies_dechets"],
-					taux_co2 = fields["taux_co2"],
-					heure = h,
-					hydraulique_fil_eau_eclusee = fields["hydraulique_fil_eau_eclusee"],
-					bioenergies_biogaz = fields["bioenergies_biogaz"],
-					fioul_tac = fields["fioul_tac"],
-					gaz_ccg = fields["gaz_ccg"],
 					date_heure = fields["date_heure"],
-					charbon = fields["charbon"],
-					bioenergies = fields["bioenergies"],
-					ech_comm_angleterre = fields["ech_comm_angleterre"],
-					consommation = fields["consommation"])
-				
-					r.save()
-				# The 2 other points of data each hour have a lot less filled out
-				else :
-					r = Record(recordid = record["records"][i]["recordid"],
-					prevision_j1 = fields["prevision_j1"],
-					nature = fields["nature"],
-					date_heure = fields["date_heure"],
-					perimetre = fields["perimetre"],
-					date = fields["date"],
-					heure = h,
-					prevision_j = fields["prevision_j"])
-					
-					r.save()
+					taux_co2 = fields["taux_co2"])
+				# The rest of the time the dataset is missing the CO2 rate
+				# We won't save an entry into the database
+			# The last row will be the first row of the next batch, we don't want to count it twice
 			nTot += (n-1)
-			d = r.date
+			startDate = record["records"][n-1]["fields"]["date"]
 		else :
 			raise Http404("Request was not successfully received")
-	return HttpResponse(str(nTot+1)+" Records from 2017-01-01 to "+d+" has been retrieved. Last batch had "+str(nhits)+" Records")
+	return HttpResponse(str(nTot+1)+" Records from 2017-01-01 to "+startDate+" has been retrieved. Last batch had "+str(nhits)+" Records")
